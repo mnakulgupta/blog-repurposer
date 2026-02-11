@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { Loader2, Link as LinkIcon, Linkedin, Twitter, Search, Youtube, Sparkles } from "lucide-react";
+import { Loader2, Link as LinkIcon, Linkedin, Twitter, Search, Youtube, Sparkles, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ContentCard from "@/components/ContentCard";
 import OutputSection from "@/components/OutputSection";
+import { useAuth } from "@/hooks/useAuth";
 import type { RepurposedContent } from "@/types/repurpose";
 
 const Index = () => {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RepurposedContent | null>(null);
+  const { signOut } = useAuth();
 
   const isValidUrl = (str: string) => {
     try {
@@ -63,16 +65,21 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card">
-        <div className="mx-auto max-w-3xl px-4 py-8 text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Sparkles className="h-7 w-7 text-primary" />
-            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-              AI Blog Content Repurposer
-            </h1>
+        <div className="mx-auto max-w-3xl px-4 py-8 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-7 w-7 text-primary" />
+              <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
+                AI Blog Content Repurposer
+              </h1>
+            </div>
+            <p className="text-muted-foreground">
+              Turn one blog post into multiple content assets
+            </p>
           </div>
-          <p className="text-muted-foreground">
-            Turn one blog post into multiple content assets
-          </p>
+          <Button variant="ghost" size="icon" onClick={signOut} title="Sign out">
+            <LogOut className="h-5 w-5" />
+          </Button>
         </div>
       </header>
 

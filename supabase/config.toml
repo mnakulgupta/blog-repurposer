@@ -1,1 +1,4 @@
 project_id = "gryzacoxixrtckijqcsr"
+
+[functions.repurpose-content]
+verify_jwt = false
