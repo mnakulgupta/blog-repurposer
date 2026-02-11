@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Linkedin, Twitter, Search, Youtube, Sparkles, LogOut, AlertCircle, RefreshCw, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,12 +79,12 @@ const Index = () => {
       <header className="border-b border-border bg-card">
         <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8 flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <Sparkles className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
                 AI Blog Content Repurposer
               </h1>
-            </div>
+            </Link>
             <p className="text-sm text-muted-foreground">
               Turn one blog post into multiple content assets
             </p>
