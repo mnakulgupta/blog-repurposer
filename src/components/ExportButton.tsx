@@ -1,0 +1,65 @@
+import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { RepurposedContent, ToneOption } from "@/types/repurpose";
+import { TONE_LABELS } from "@/types/repurpose";
+
+interface ExportButtonProps {
+  result: RepurposedContent;
+  url: string;
+  tone: ToneOption;
+}
+
+const ExportButton = ({ result, url, tone }: ExportButtonProps) => {
+  const handleExport = () => {
+    const now = new Date();
+    const ts = now.toLocaleString();
+    const filename = `blog-repurposer-${now.toISOString().slice(0, 16).replace(/[T:]/g, "-")}.md`;
+
+    const lines = [
+      "# Blog Content Repurpose",
+      `Generated on: ${ts}`,
+      `Original URL: ${url}`,
+      "",
+      "## Blog Details",
+      `- Title: ${result.blogMeta?.title ?? "N/A"}`,
+      `- Word Count: ${result.blogMeta?.wordCount ?? "N/A"}`,
+      `- Generated Tone: ${TONE_LABELS[tone]}`,
+      "",
+      "---",
+      "",
+      "## LinkedIn Posts",
+      "",
+      ...result.linkedinPosts.flatMap((p) => [`### ${p.angle}`, "", p.content, ""]),
+      "---",
+      "",
+      "## Twitter Thread Hooks",
+      "",
+      ...result.twitterHooks.flatMap((h) => [`### ${h.type}`, "", h.content, ""]),
+      "---",
+      "",
+      "## Meta Description",
+      "", result.metaDescription, "",
+      "---",
+      "",
+      "## YouTube Video Content",
+      "",
+      `### Title`, "", result.youtube.title, "",
+      `### Description`, "", result.youtube.description,
+    ];
+
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  return (
+    <Button variant="outline" onClick={handleExport} className="gap-2">
+      <Download className="h-4 w-4" /> Export All as Markdown
+    </Button>
+  );
+};
+
+export default ExportButton;

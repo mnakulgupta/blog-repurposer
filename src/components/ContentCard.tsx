@@ -8,6 +8,13 @@ interface ContentCardProps {
   charLimit?: number;
 }
 
+function charColor(len: number, limit: number) {
+  const ratio = len / limit;
+  if (ratio > 1) return "text-destructive";
+  if (ratio > 0.85) return "text-warning";
+  return "text-success";
+}
+
 const ContentCard = ({ label, content, charLimit }: ContentCardProps) => {
   const [copied, setCopied] = useState(false);
 
@@ -25,26 +32,15 @@ const ContentCard = ({ label, content, charLimit }: ContentCardProps) => {
         </span>
         <div className="flex items-center gap-2">
           {charLimit && (
-            <span className={`text-xs ${content.length > charLimit ? "text-destructive" : "text-muted-foreground"}`}>
+            <span className={`text-xs font-medium ${charColor(content.length, charLimit)}`}>
               {content.length}/{charLimit}
             </span>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCopy}
-            className="h-7 gap-1.5 text-xs"
-          >
+          <Button variant="ghost" size="sm" onClick={handleCopy} className="h-7 gap-1.5 text-xs">
             {copied ? (
-              <>
-                <Check className="h-3.5 w-3.5 text-green-500" />
-                Copied!
-              </>
+              <><Check className="h-3.5 w-3.5 text-success" /> Copied!</>
             ) : (
-              <>
-                <Copy className="h-3.5 w-3.5" />
-                Copy
-              </>
+              <><Copy className="h-3.5 w-3.5" /> Copy</>
             )}
           </Button>
         </div>
