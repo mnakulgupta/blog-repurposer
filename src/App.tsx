@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -37,7 +38,7 @@ const AuthRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/tool" replace />;
   return <>{children}</>;
 };
 
@@ -48,7 +49,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/tool" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
