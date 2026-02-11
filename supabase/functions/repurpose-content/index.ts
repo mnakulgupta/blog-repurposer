@@ -62,7 +62,7 @@ serve(async (req) => {
 
   try {
 
-    const { url, tone = "b2b-formal" } = await req.json();
+    const { url, tone = "b2b-formal", manualText } = await req.json();
     if (!url || typeof url !== 'string') {
       return new Response(JSON.stringify({ error: "Valid URL is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -103,25 +103,39 @@ serve(async (req) => {
       });
     }
 
-    // Step 1: Extract content
-    console.log("Extracting content from:", url);
-    const jinaResponse = await fetch(`https://r.jina.ai/${url}`, {
-      headers: { Accept: "text/markdown" },
-    });
+    // Step 1: Extract content (skip if manualText provided)
+    let blogContent: string;
 
-    if (!jinaResponse.ok) {
+    if (manualText && typeof manualText === "string" && manualText.trim().length >= 200) {
+      console.log("Using manual text input, skipping Jina extraction");
+      blogContent = manualText.trim();
+    } else if (manualText) {
       return new Response(
-        JSON.stringify({ error: "Unable to fetch content. This blog might be protected or require authentication.", errorType: "fetch_failed" }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Manual text must be at least 200 characters.", errorType: "validation_failed" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    }
+    } else {
+      console.log("Extracting content from:", url);
+      const jinaResponse = await fetch(`https://r.jina.ai/${url}`, {
+        headers: { Accept: "text/markdown" },
+      });
 
-    const blogContent = await jinaResponse.text();
-    if (!blogContent || blogContent.length < 100) {
-      return new Response(
-        JSON.stringify({ error: "Content extraction failed. Try a different blog URL.", errorType: "extraction_failed" }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (!jinaResponse.ok) {
+        return new Response(
+          JSON.stringify({ error: "EXTRACTION_FAILED", message: "We couldn't read that URL automatically. The site might be blocking bots.", errorType: "extraction_failed" }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const rawContent = await jinaResponse.text();
+      if (!rawContent || rawContent.trim().length < 200) {
+        return new Response(
+          JSON.stringify({ error: "EXTRACTION_FAILED", message: "We couldn't read that URL automatically. The site might be blocking bots.", errorType: "extraction_failed" }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      blogContent = rawContent;
     }
 
     const blogMeta = extractMetadata(blogContent, url);
