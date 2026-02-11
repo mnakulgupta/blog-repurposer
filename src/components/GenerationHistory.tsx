@@ -76,6 +76,9 @@ const GenerationHistory = ({ onSelect }: Props) => {
           >
             <Trash2 className="h-3.5 w-3.5" /> Clear History
           </Button>
+          <p className="text-[11px] text-muted-foreground text-center pt-1">
+            History is stored locally in your browser. Clear your browser data to remove.
+          </p>
         </div>
       )}
     </div>
