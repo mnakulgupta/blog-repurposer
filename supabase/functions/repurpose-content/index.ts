@@ -86,8 +86,42 @@ serve(async (req) => {
     console.log("Request from user:", userId);
 
     const { url, tone = "b2b-formal" } = await req.json();
-    if (!url) {
-      return new Response(JSON.stringify({ error: "URL is required" }), {
+    if (!url || typeof url !== 'string') {
+      return new Response(JSON.stringify({ error: "Valid URL is required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate URL format, scheme, length, and block private IPs
+    if (url.length > 2048) {
+      return new Response(JSON.stringify({ error: "URL exceeds maximum length" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    let parsedUrl: URL;
+    try { parsedUrl = new URL(url); } catch {
+      return new Response(JSON.stringify({ error: "Invalid URL format" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+      return new Response(JSON.stringify({ error: "Only HTTP/HTTPS URLs are allowed" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const hostname = parsedUrl.hostname;
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname === '::1' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.internal')
+    ) {
+      return new Response(JSON.stringify({ error: "Private or internal URLs are not allowed" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -241,7 +275,7 @@ REQUIREMENTS:
   } catch (e) {
     console.error("repurpose error:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error occurred", errorType: "unknown" }),
+      JSON.stringify({ error: "An error occurred while processing your request. Please try again.", errorType: "server_error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
