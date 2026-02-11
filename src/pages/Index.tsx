@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Linkedin, Twitter, Search, Youtube, Sparkles, AlertCircle, RefreshCw, Link as LinkIcon, Info } from "lucide-react";
+import { Linkedin, Twitter, Search, Youtube, Sparkles, AlertCircle, RefreshCw, Link as LinkIcon, Info, ClipboardPaste } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ContentCard from "@/components/ContentCard";
@@ -24,6 +25,8 @@ const Index = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastGenerated, setLastGenerated] = useState<string | null>(null);
   const [fromHistory, setFromHistory] = useState<string | null>(null);
+  const [isManualMode, setIsManualMode] = useState(false);
+  const [manualText, setManualText] = useState("");
 
   const isValidUrl = (str: string) => {
     try { new URL(str); return true; } catch { return false; }
@@ -34,16 +37,27 @@ const Index = () => {
     setFromHistory(null);
     if (!url.trim()) { setError("Please enter a blog URL"); return; }
     if (!isValidUrl(url)) { setError("Invalid URL format. Please enter a complete URL starting with http:// or https://"); return; }
+    if (isManualMode && manualText.trim().length < 200) { setError("Please paste at least 200 characters of blog content."); return; }
 
     setLoading(true);
     setResult(null);
 
+    const body: Record<string, string> = { url, tone };
+    if (isManualMode && manualText.trim()) {
+      body.manualText = manualText.trim();
+    }
+
     try {
       const { data, error: fnError } = await supabase.functions.invoke("repurpose-content", {
-        body: { url, tone },
+        body,
       });
 
       if (fnError) { setError(fnError.message || "Something went wrong. Please try again."); return; }
+      if (data?.error === "EXTRACTION_FAILED") {
+        setIsManualMode(true);
+        setError(data.message || "Automatic extraction failed. Please paste the article text manually.");
+        return;
+      }
       if (data?.error) { setError(data.error); return; }
 
       const content = data as RepurposedContent;
@@ -122,10 +136,35 @@ const Index = () => {
               disabled={loading}
             />
           </div>
-          <Button onClick={handleSubmit} disabled={loading} className="gap-2 min-w-[140px]">
-            Generate Content
+          <Button onClick={handleSubmit} disabled={loading || (isManualMode && manualText.trim().length < 200)} className="gap-2 min-w-[140px]">
+            {isManualMode ? "Generate from Text" : "Generate Content"}
           </Button>
         </div>
+
+        {/* Manual paste fallback */}
+        {isManualMode && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground flex items-center gap-2">
+              <ClipboardPaste className="h-4 w-4 text-primary" />
+              Paste Blog Content Here
+            </label>
+            <Textarea
+              value={manualText}
+              onChange={(e) => setManualText(e.target.value)}
+              placeholder="Copy the full article text from the blog post and paste it here..."
+              className="min-h-[180px]"
+              disabled={loading}
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {manualText.length} characters {manualText.length < 200 && manualText.length > 0 ? `(need at least 200)` : ""}
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => { setIsManualMode(false); setManualText(""); setError(null); }} className="text-xs">
+                Switch back to auto-extract
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Error display */}
         {error && (
