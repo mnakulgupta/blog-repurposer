@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Linkedin, Twitter, Search, Youtube, Sparkles, LogOut, AlertCircle, RefreshCw, Link as LinkIcon } from "lucide-react";
+import { Linkedin, Twitter, Search, Youtube, Sparkles, AlertCircle, RefreshCw, Link as LinkIcon, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,7 +13,6 @@ import ToneSelector from "@/components/ToneSelector";
 import ExportButton from "@/components/ExportButton";
 import LoadingSteps from "@/components/LoadingSteps";
 import GenerationHistory, { saveToHistory } from "@/components/GenerationHistory";
-import { useAuth } from "@/hooks/useAuth";
 import type { RepurposedContent, ToneOption } from "@/types/repurpose";
 
 const Index = () => {
@@ -24,7 +23,7 @@ const Index = () => {
   const [activeUrl, setActiveUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [lastGenerated, setLastGenerated] = useState<string | null>(null);
-  const { signOut } = useAuth();
+  const [fromHistory, setFromHistory] = useState<string | null>(null);
 
   const isValidUrl = (str: string) => {
     try { new URL(str); return true; } catch { return false; }
@@ -32,6 +31,7 @@ const Index = () => {
 
   const handleSubmit = async () => {
     setError(null);
+    setFromHistory(null);
     if (!url.trim()) { setError("Please enter a blog URL"); return; }
     if (!isValidUrl(url)) { setError("Invalid URL format. Please enter a complete URL starting with http:// or https://"); return; }
 
@@ -71,6 +71,7 @@ const Index = () => {
     setResult(histResult);
     setActiveUrl(histUrl);
     setUrl(histUrl);
+    setFromHistory(new Date().toLocaleTimeString());
   };
 
   return (
@@ -85,7 +86,7 @@ const Index = () => {
                 AI Blog Content Repurposer
               </h1>
             </Link>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mt-1">
               Turn one blog post into multiple content assets
             </p>
           </div>
@@ -95,9 +96,6 @@ const Index = () => {
                 Last: {lastGenerated}
               </span>
             )}
-            <Button variant="ghost" size="icon" onClick={signOut} title="Sign out">
-              <LogOut className="h-5 w-5" />
-            </Button>
           </div>
         </div>
       </header>
@@ -145,13 +143,24 @@ const Index = () => {
         {/* Loading */}
         {loading && <LoadingSteps />}
 
+        {/* History loaded banner */}
+        {fromHistory && result && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>Showing previously generated content</span>
+              <Button variant="ghost" size="sm" onClick={() => { setFromHistory(null); handleSubmit(); }} className="gap-1.5 shrink-0 ml-3">
+                <RefreshCw className="h-3.5 w-3.5" /> Generate New Version
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Results */}
         {result && (
           <div className="space-y-8">
-            {/* Blog Preview */}
             {result.blogMeta && <BlogPreview meta={result.blogMeta} url={activeUrl} />}
 
-            {/* Export */}
             <div className="flex justify-end">
               <ExportButton result={result} url={activeUrl} tone={tone} />
             </div>
