@@ -6,16 +6,65 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function extractMetadata(markdown: string, url: string) {
+  const lines = markdown.split("\n");
+  let title = "";
+  let author = "";
+  let date = "";
+  let image = "";
+
+  for (const line of lines.slice(0, 30)) {
+    if (!title && /^#\s+/.test(line)) {
+      title = line.replace(/^#+\s*/, "").trim();
+    }
+    if (!author && /author|by\s/i.test(line)) {
+      const match = line.match(/(?:by|author[:\s]*)\s*([A-Z][a-z]+ [A-Z][a-z]+)/i);
+      if (match) author = match[1];
+    }
+    if (!date) {
+      const dateMatch = line.match(/(\w+ \d{1,2},?\s*\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/);
+      if (dateMatch) date = dateMatch[1];
+    }
+    if (!image) {
+      const imgMatch = line.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+      if (imgMatch) image = imgMatch[1];
+    }
+  }
+
+  if (!title) {
+    try {
+      const urlObj = new URL(url);
+      const slug = urlObj.pathname.split("/").filter(Boolean).pop() || "";
+      title = slug.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    } catch { title = "Untitled Blog Post"; }
+  }
+
+  const words = markdown.split(/\s+/).filter(Boolean);
+  const wordCount = words.length;
+  const readingTime = Math.max(1, Math.ceil(wordCount / 250));
+  const plainText = markdown.replace(/[#*\[\]()!`>|_~-]/g, " ").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim();
+  const previewText = plainText.substring(0, 1200).replace(/\s\S*$/, "");
+
+  return { title, author, date, image, wordCount, readingTime, previewText };
+}
+
+function getToneInstruction(tone: string): string {
+  switch (tone) {
+    case "b2b-casual": return "Write in a B2B tone but keep it conversational and approachable. Use contractions, direct address, and a friendly expert voice.";
+    case "b2c-formal": return "Write for consumers in a polished, professional tone. Be informative and authoritative while remaining accessible.";
+    case "b2c-casual": return "Write in a fun, engaging consumer-friendly tone. Be relatable, use everyday language, and connect emotionally.";
+    default: return "Write in a professional B2B tone. Be authoritative, data-driven, and insightful. Avoid fluff.";
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Authenticate user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -29,23 +78,21 @@ serve(async (req) => {
     const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const userId = claimsData.claims.sub;
     console.log("Request from user:", userId);
 
-    const { url } = await req.json();
+    const { url, tone = "b2b-formal" } = await req.json();
     if (!url) {
       return new Response(JSON.stringify({ error: "URL is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Step 1: Extract content via Jina Reader
+    // Step 1: Extract content
     console.log("Extracting content from:", url);
     const jinaResponse = await fetch(`https://r.jina.ai/${url}`, {
       headers: { Accept: "text/markdown" },
@@ -53,7 +100,7 @@ serve(async (req) => {
 
     if (!jinaResponse.ok) {
       return new Response(
-        JSON.stringify({ error: "Couldn't extract content from this URL. Try a different blog post." }),
+        JSON.stringify({ error: "Unable to fetch content. This blog might be protected or require authentication.", errorType: "fetch_failed" }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -61,16 +108,20 @@ serve(async (req) => {
     const blogContent = await jinaResponse.text();
     if (!blogContent || blogContent.length < 100) {
       return new Response(
-        JSON.stringify({ error: "Extracted content is too short. Try a different blog post." }),
+        JSON.stringify({ error: "Content extraction failed. Try a different blog URL.", errorType: "extraction_failed" }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Step 2: Generate repurposed content via AI
+    const blogMeta = extractMetadata(blogContent, url);
+
+    // Step 2: Generate repurposed content
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are an expert content repurposer for social media and SEO. You write in a natural, human voice — not corporate AI speak. You avoid phrases like "revolutionize", "game-changer", "unlock", "in today's landscape", "In today's rapidly evolving landscape", or "Unlock the power of".`;
+    const toneInstruction = getToneInstruction(tone);
+
+    const systemPrompt = `You are an expert content repurposer for social media and SEO. You write in a natural, human voice — not corporate AI speak. You avoid phrases like "revolutionize", "game-changer", "unlock", "in today's landscape", "In today's rapidly evolving landscape", or "Unlock the power of". ${toneInstruction}`;
 
     const userPrompt = `I will provide you with a blog post content. Generate repurposed content assets.
 
@@ -157,18 +208,18 @@ REQUIREMENTS:
 
     if (!aiResponse.ok) {
       if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
+        return new Response(JSON.stringify({ error: "Rate limit reached. Please wait a moment before trying again.", errorType: "rate_limit" }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds." }), {
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds.", errorType: "credits" }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const errText = await aiResponse.text();
       console.error("AI error:", aiResponse.status, errText);
-      return new Response(JSON.stringify({ error: "AI generation failed. Please try again." }), {
+      return new Response(JSON.stringify({ error: "AI generation failed. Please try again in a moment.", errorType: "ai_failed" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -177,20 +228,20 @@ REQUIREMENTS:
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
       console.error("No tool call in response:", JSON.stringify(aiData));
-      return new Response(JSON.stringify({ error: "AI generation failed. Please try again." }), {
+      return new Response(JSON.stringify({ error: "AI generation failed. Please try again.", errorType: "ai_failed" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const content = JSON.parse(toolCall.function.arguments);
 
-    return new Response(JSON.stringify(content), {
+    return new Response(JSON.stringify({ ...content, blogMeta }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("repurpose error:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error occurred" }),
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error occurred", errorType: "unknown" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
