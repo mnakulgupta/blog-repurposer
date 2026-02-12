@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,15 +7,10 @@ const corsHeaders = {
 
 function extractMetadata(markdown: string, url: string) {
   const lines = markdown.split("\n");
-  let title = "";
-  let author = "";
-  let date = "";
-  let image = "";
+  let title = "", author = "", date = "", image = "";
 
   for (const line of lines.slice(0, 30)) {
-    if (!title && /^#\s+/.test(line)) {
-      title = line.replace(/^#+\s*/, "").trim();
-    }
+    if (!title && /^#\s+/.test(line)) title = line.replace(/^#+\s*/, "").trim();
     if (!author && /author|by\s/i.test(line)) {
       const match = line.match(/(?:by|author[:\s]*)\s*([A-Z][a-z]+ [A-Z][a-z]+)/i);
       if (match) author = match[1];
@@ -61,7 +55,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-
     const { url, tone = "b2b-formal", manualText } = await req.json();
     if (!url || typeof url !== 'string') {
       return new Response(JSON.stringify({ error: "Valid URL is required" }), {
@@ -69,7 +62,6 @@ serve(async (req) => {
       });
     }
 
-    // Validate URL format, scheme, length, and block private IPs
     if (url.length > 2048) {
       return new Response(JSON.stringify({ error: "URL exceeds maximum length" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -88,22 +80,16 @@ serve(async (req) => {
     }
     const hostname = parsedUrl.hostname;
     if (
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname === '0.0.0.0' ||
-      hostname === '::1' ||
-      hostname.startsWith('192.168.') ||
-      hostname.startsWith('10.') ||
+      hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0' || hostname === '::1' ||
+      hostname.startsWith('192.168.') || hostname.startsWith('10.') ||
       /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
-      hostname.endsWith('.local') ||
-      hostname.endsWith('.internal')
+      hostname.endsWith('.local') || hostname.endsWith('.internal')
     ) {
       return new Response(JSON.stringify({ error: "Private or internal URLs are not allowed" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Step 1: Extract content (skip if manualText provided)
     let blogContent: string;
 
     if (manualText && typeof manualText === "string" && manualText.trim().length >= 200) {
@@ -140,13 +126,12 @@ serve(async (req) => {
 
     const blogMeta = extractMetadata(blogContent, url);
 
-    // Step 2: Generate repurposed content
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const toneInstruction = getToneInstruction(tone);
 
-    const systemPrompt = `You are an expert content repurposer for social media and SEO. You write in a natural, human voice — not corporate AI speak. You avoid phrases like "revolutionize", "game-changer", "unlock", "in today's landscape", "In today's rapidly evolving landscape", or "Unlock the power of". ${toneInstruction}`;
+    const systemPrompt = `You are an expert content repurposer for social media, email, and SEO. You write in a natural, human voice — not corporate AI speak. You avoid phrases like "revolutionize", "game-changer", "unlock", "in today's landscape", or "Unlock the power of". ${toneInstruction}`;
 
     const userPrompt = `I will provide you with a blog post content. Generate repurposed content assets.
 
@@ -155,7 +140,7 @@ Blog Content:
 ${blogContent.substring(0, 8000)}
 ---
 
-Generate the following. Use tool calling to return structured output.
+Generate ALL of the following. Use tool calling to return structured output.
 
 REQUIREMENTS:
 - LinkedIn posts: 150-250 words each, natural human voice, NO corporate jargon, each genuinely different angle. Use line breaks for readability.
@@ -163,6 +148,9 @@ REQUIREMENTS:
 - Meta description: Under 160 characters, SEO-optimized, action-oriented
 - YouTube title: Under 60 characters, engaging but not clickbait
 - YouTube description: 3-4 sentences, video-focused language
+- Email newsletter: Subject line under 50 chars, preview text under 90 chars, body 150-200 words summarizing key takeaways with a CTA
+- Instagram carousel: 5-7 slides for a carousel post. Slide 1 is the hook, middle slides are key points, last slide is CTA. Each slide under 100 words.
+- Content score: Analyze the blog for readability (0-100), engagement potential (0-100), SEO strength (0-100), primary keyword density percentage, and a 1-2 sentence summary of content quality
 - Write like a human marketer, not like ChatGPT`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -220,8 +208,49 @@ REQUIREMENTS:
                     required: ["title", "description"],
                     additionalProperties: false,
                   },
+                  emailNewsletter: {
+                    type: "object",
+                    properties: {
+                      subjectLine: { type: "string" },
+                      previewText: { type: "string" },
+                      body: { type: "string" },
+                    },
+                    required: ["subjectLine", "previewText", "body"],
+                    additionalProperties: false,
+                  },
+                  instagramCarousel: {
+                    type: "object",
+                    properties: {
+                      slides: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            slideNumber: { type: "number" },
+                            text: { type: "string" },
+                          },
+                          required: ["slideNumber", "text"],
+                          additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ["slides"],
+                    additionalProperties: false,
+                  },
+                  contentScore: {
+                    type: "object",
+                    properties: {
+                      readability: { type: "number" },
+                      engagement: { type: "number" },
+                      seoStrength: { type: "number" },
+                      keywordDensity: { type: "string" },
+                      summary: { type: "string" },
+                    },
+                    required: ["readability", "engagement", "seoStrength", "keywordDensity", "summary"],
+                    additionalProperties: false,
+                  },
                 },
-                required: ["linkedinPosts", "twitterHooks", "metaDescription", "youtube"],
+                required: ["linkedinPosts", "twitterHooks", "metaDescription", "youtube", "emailNewsletter", "instagramCarousel", "contentScore"],
                 additionalProperties: false,
               },
             },

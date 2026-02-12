@@ -44,8 +44,38 @@ const ExportButton = ({ result, url, tone }: ExportButtonProps) => {
       "## YouTube Video Content",
       "",
       `### Title`, "", result.youtube.title, "",
-      `### Description`, "", result.youtube.description,
+      `### Description`, "", result.youtube.description, "",
     ];
+
+    if (result.emailNewsletter) {
+      lines.push(
+        "---", "",
+        "## Email Newsletter", "",
+        `### Subject Line`, "", result.emailNewsletter.subjectLine, "",
+        `### Preview Text`, "", result.emailNewsletter.previewText, "",
+        `### Body`, "", result.emailNewsletter.body, "",
+      );
+    }
+
+    if (result.instagramCarousel) {
+      lines.push(
+        "---", "",
+        "## Instagram Carousel", "",
+        ...result.instagramCarousel.slides.flatMap((s) => [`### Slide ${s.slideNumber}`, "", s.text, ""]),
+      );
+    }
+
+    if (result.contentScore) {
+      lines.push(
+        "---", "",
+        "## Content Score", "",
+        `- Readability: ${result.contentScore.readability}/100`,
+        `- Engagement: ${result.contentScore.engagement}/100`,
+        `- SEO Strength: ${result.contentScore.seoStrength}/100`,
+        `- Keyword Density: ${result.contentScore.keywordDensity}`,
+        `- Summary: ${result.contentScore.summary}`,
+      );
+    }
 
     const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
     const a = document.createElement("a");

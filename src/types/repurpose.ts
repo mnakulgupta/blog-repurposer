@@ -8,11 +8,22 @@ export interface BlogMeta {
   previewText: string;
 }
 
+export interface ContentScore {
+  readability: number;
+  engagement: number;
+  seoStrength: number;
+  keywordDensity: string;
+  summary: string;
+}
+
 export interface RepurposedContent {
   linkedinPosts: { angle: string; content: string }[];
   twitterHooks: { type: string; content: string }[];
   metaDescription: string;
   youtube: { title: string; description: string };
+  emailNewsletter: { subjectLine: string; previewText: string; body: string };
+  instagramCarousel: { slides: { slideNumber: number; text: string }[] };
+  contentScore: ContentScore;
   blogMeta: BlogMeta;
 }
 
