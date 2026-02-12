@@ -18,7 +18,7 @@ import ExportButton from "@/components/ExportButton";
 import LoadingSteps from "@/components/LoadingSteps";
 import HistorySidebar, { saveToHistory } from "@/components/HistorySidebar";
 import EmptyState from "@/components/EmptyState";
-import ContentScoreCard from "@/components/ContentScoreCard";
+
 import type { RepurposedContent, ToneOption } from "@/types/repurpose";
 
 const Index = () => {
@@ -236,8 +236,8 @@ const Index = () => {
             <div className="space-y-8">
               {result.blogMeta && <BlogPreview meta={result.blogMeta} url={activeUrl} />}
 
-              {/* Content Score */}
-              {result.contentScore && <ContentScoreCard score={result.contentScore} />}
+
+
 
               <div className="flex justify-end">
                 <ExportButton result={result} url={activeUrl} tone={tone} />
